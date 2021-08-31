@@ -36,6 +36,8 @@ ThisBuild / wartremoverWarnings := {
     Warts.allBut(
       Wart.ImplicitConversion,
       Wart.ImplicitParameter,
+      Wart.StringPlusAny,
+      Wart.Overloading
     )
   else
     (ThisBuild / wartremoverWarnings).value
