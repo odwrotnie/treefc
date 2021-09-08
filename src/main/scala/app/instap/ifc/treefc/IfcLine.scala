@@ -8,12 +8,12 @@ sealed trait IfcLine {
 object IfcLine {
   // #1824= IFCPROPERTYSET('1TSTJNin2fQ27MjK9Itwgr',#12,'01 MW_KLASYFIKACJA',$,(#1814,#1815,#1816,#1817,#1818,#1819,#1820,#1821,#1822,#1823));
   private val IFCPROPERTYSET_REGEX = """#(\d+)=.?IFCPROPERTYSET\('([^']+)',#(\d+),'([^']+)',\$,\(([^\(\)]+)\)\);""".r
-  private val IFCRELDEFINESBYPROPERTIES = """#(\d+)=.?IFCRELDEFINESBYPROPERTIES\('([^']+)',#(\d+),\$,\$,\(([^\(\)]+)\),#(\d+)\);""".r
+  private val IFCRELDEFINESBYPROPERTIES = """#(\d+)=.?IFCRELDEFINESBYPROPERTIES\('([^']+)',#(\d+),\$,\$,\(([^\(\)]+)\),(#\d+)\);""".r
   private val IFCPROPERTYSINGLEVALUE = """#(\d+)=.?IFCPROPERTYSINGLEVALUE\('([^']+)',\$,([^,]+),\$\);""".r
   private val LINE_REGEX = raw"""#(\d+)= (\w+)\((.+)\);""".r
   private val SPLITTER = ","
 
-  private def parseRefs(str: String): List[IfcRef] = str
+  private def parseRefs(str: String)(implicit find: Long => Option[IfcLine]): List[IfcRef] = str
     .split(SPLITTER)
     .toList
     .map(v => IfcTag(v))
@@ -25,7 +25,7 @@ object IfcLine {
     }
     .flatten
 
-  def apply(line: String): Option[IfcLine] =
+      def apply(line: String)(implicit find: Long => Option[IfcLine]): Option[IfcLine] =
     line match {
       case s if s.contains("IFCPOLYLOOP") => None
       case s if s.contains("IFCFACE") => None
@@ -44,9 +44,9 @@ object IfcLine {
       case IFCPROPERTYSET_REGEX(id, propertyId, _, name, refs) =>
         val r = parseRefs(refs)
         Some(IfcPropertySet(id.toLong, propertyId, 123, name, r))
-      case IFCRELDEFINESBYPROPERTIES(id, propertyId, _, _, _, refs, _) =>
+      case IFCRELDEFINESBYPROPERTIES(id, propertyId, _, refs, ref) =>
         val r = parseRefs(refs)
-        Some(IfcRelDefines(id.toLong, propertyId, r))
+        Some(IfcRelDefines(id.toLong, propertyId, r, IfcTag(ref)))
       case IFCPROPERTYSINGLEVALUE(id, name, value) =>
         val t = IfcTag.apply(value)
         Some(IfcSingleValue(id.toLong, name, t))
@@ -56,8 +56,11 @@ object IfcLine {
       case LINE_REGEX(id, name, values) =>
         val tags = values.split(SPLITTER).toList.map(v => IfcTag(v))
         Some(IfcNode(id.toLong, name, tags))
-      case _ =>
-        None
+      case s =>
+        if (s.startsWith("#")) // All interesting shit starts with #
+          throw new Exception(s"Can't parse $s")
+        else
+          None
     }
 }
 
@@ -65,6 +68,7 @@ final case class IfcRelDefines(
     id: Long,
     propertyId: String,
     children: List[IfcRef],
+    ref: IfcTag
   ) extends IfcLine
 
 final case class IfcSingleValue(

@@ -11,7 +11,7 @@ object IfcTag {
   private val IFC_DOUBLE_REGEX = """(\d+\.?\d?)""".r
   private val IFC_LABEL_REGEX = """IFCLABEL\('(.*)'\)""".r
 
-  def apply(value: String): IfcTag = value match {
+  def apply(value: String)(implicit find: Long => Option[IfcLine]): IfcTag = value match {
     case IFC_TEXT_REGEX(text) => IfcString(text)
     case IFC_REF_REGEX(index) => IfcRef(index.toLong)
     case IFC_STRING_REGEX(s) => IfcString(s)
@@ -23,14 +23,20 @@ object IfcTag {
   }
 }
 
-final case class IfcRef(index: Long) extends IfcTag
+final case class IfcRef(index: Long)(implicit find: Long => Option[IfcLine]) extends IfcTag {
+  override def toString() = s"REF($index)->${find(index)}"
+}
 
-final case class IfcString(value: String) extends IfcTag
+final case class IfcString(value: String) extends IfcTag {
+  override def toString() = value
+}
 
 final case class IfcDouble(value: Double) extends IfcTag
 
 final case object IfcEmptyString extends IfcTag
 
-final case object IfcDollar extends IfcTag
+final case object IfcDollar extends IfcTag {
+  override def toString() = "$"
+}
 
 final case class IfcUnknown(value: String) extends IfcTag
